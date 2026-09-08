@@ -306,8 +306,10 @@ const char* nomCamp[] = {"CAMERA", "LENS", "FPS", "SHUTTER", "FILTER SLOT 1", "F
 int campActual = CAMP_CAP;
 bool editant = false;
 
-enum { PANT_PRINCIPAL, PANT_TRIA, PANT_ESTAT };
+enum { PANT_PRINCIPAL, PANT_TRIA, PANT_ESTAT, PANT_ACTUALITZAT };
 int pantalla = PANT_PRINCIPAL;
+unsigned long momentActualitzat = 0;   // per tornar sol a la pantalla principal
+#define AVIS_MS 5000
 int triaCamp = 0;
 int triaCursor = 0;
 bool bleConnectat = false;
@@ -689,6 +691,50 @@ void dibuixaEstat() {
 }
 
 // =====================================================================
+//  Pantalla de confirmacio despres de rebre llistes del mobil
+// =====================================================================
+void dibuixaActualitzat() {
+  canvas.fillScreen(1);
+  canvas.drawRoundRect(0, 0, EPD_W, EPD_H, RADI_GRAN, 0);
+  canvas.drawRoundRect(3, 3, EPD_W - 6, EPD_H - 6, RADI_GRAN - 1, 0);
+
+  canvas.fillRoundRect(10, 14, EPD_W - 20, 56, RADI_GRAN, 0);
+  textFont(10, 14, EPD_W - 20, 56, "LISTS UPDATED", &FreeSansBold18pt7b, true);
+
+  // Quantes entrades han arribat de cada llista. Si aqui hi surt menys del que
+  // has enviat, la transferencia s'ha quedat curta.
+  canvas.setFont(&FreeSansBold12pt7b);
+  canvas.setTextSize(1);
+  canvas.setTextColor(0);
+  char l[40];
+  int y = 108;
+  snprintf(l, sizeof(l), "Lenses    %d", llistes.nLens);    canvas.setCursor(40, y); canvas.print(l); y += 30;
+  snprintf(l, sizeof(l), "Filters   %d", llistes.nFiltres); canvas.setCursor(40, y); canvas.print(l); y += 30;
+  snprintf(l, sizeof(l), "FPS       %d", llistes.nFps);     canvas.setCursor(40, y); canvas.print(l); y += 30;
+  snprintf(l, sizeof(l), "Shutters  %d", llistes.nShutter); canvas.setCursor(40, y); canvas.print(l);
+
+  // Avis: algun valor que hi ha posat ara ja no es a la llista nova. No es cap
+  // error (es segueix veient), pero no el podras tornar a triar amb la roda.
+  canvas.setFont(NULL);
+  canvas.setTextSize(1);
+  int yy = 232;
+  bool cap = false;
+  const int comprova[] = {CAMP_LENS, CAMP_FPS, CAMP_SHUTTER, CAMP_F1, CAMP_F2, CAMP_F3};
+  for (int i = 0; i < 6; i++) {
+    if (indexActual(comprova[i]) < 0) {
+      if (!cap) { canvas.setCursor(40, yy); canvas.print("Still shown but no longer in the lists:"); yy += 12; cap = true; }
+      canvas.setCursor(48, yy);
+      canvas.print(nomCamp[comprova[i]]); canvas.print("  ");
+      canvas.print(valorActual(comprova[i]));
+      yy += 12;
+    }
+  }
+
+  canvas.setCursor(10, 285);
+  canvas.print("press any button to continue");
+}
+
+// =====================================================================
 //  Refresc
 // =====================================================================
 uint8_t comptadorRapids = 0;
@@ -718,9 +764,10 @@ uint32_t pixelsCanviats(const uint8_t* buf, size_t n) {
 
 void pintaAra(bool complet) {
   panelDesperta();
-  if (pantalla == PANT_PRINCIPAL)  dibuixaPrincipal();
-  else if (pantalla == PANT_TRIA)  dibuixaTria();
-  else                             dibuixaEstat();
+  if (pantalla == PANT_PRINCIPAL)       dibuixaPrincipal();
+  else if (pantalla == PANT_TRIA)       dibuixaTria();
+  else if (pantalla == PANT_ACTUALITZAT) dibuixaActualitzat();
+  else                                  dibuixaEstat();
 
   uint32_t diff = pixelsCanviats(canvas.getBuffer(), 15000);
   memcpy(fotogramaAnterior, canvas.getBuffer(), 15000);
@@ -762,6 +809,16 @@ void obreTria(int camp) {
 
 void handleButtons() {
   llegeixMenu();
+
+  if (pantalla == PANT_ACTUALITZAT) {
+    bool tecla = pressedEdge(B_EXIT) | pressedEdge(B_PRESS)
+               | pressedEdge(B_UP)   | pressedEdge(B_DOWN);   // "|" i no "||": totes
+    if (tecla || menuCurt || menuLlarg || millis() - momentActualitzat > AVIS_MS) {
+      pantalla = PANT_PRINCIPAL;
+      marcaPantalla(true);
+    }
+    return;
+  }
 
   if (pantalla == PANT_ESTAT) {
     bool sortir = pressedEdge(B_EXIT);   // sempre avaluat: mai dins d'un ||
@@ -1036,8 +1093,9 @@ void gestionaLlistesBLE() {
   Serial.print(llistes.nShutter); Serial.println(" shutters");
   // Els valors que hi havia posats es mantenen encara que ja no siguin a la
   // llista: es desa el text, no la posicio. Nomes cal repintar.
-  pantalla = PANT_PRINCIPAL;
+  pantalla = PANT_ACTUALITZAT;
   campActual = CAMP_CAP;
+  momentActualitzat = millis();
   marcaPantalla(true);
 }
 

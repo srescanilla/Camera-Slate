@@ -341,6 +341,13 @@ document.getElementById("wipe").onclick=()=>{
 };
 
 /* ---------- Connection ---------- */
+function avis(html){
+  const w=document.getElementById("warn");
+  if(!html){ w.style.display="none"; return; }
+  w.innerHTML=html; w.style.display="block";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
 const dot=document.getElementById("dot"), st=document.getElementById("st");
 const logEl=document.getElementById("log");
 function log(m){ logEl.textContent=m; }
@@ -360,18 +367,42 @@ document.getElementById("conn").onclick=async()=>{
     dev.addEventListener("gattserverdisconnected",()=>connectat(false));
     srv=await dev.gatt.connect();
     const s=await srv.getPrimaryService(SVC);
-    ch.cam=await s.getCharacteristic(U_CAM);
-    ch.len=await s.getCharacteristic(U_LEN);
-    ch.f1 =await s.getCharacteristic(U_F1);
-    ch.f2 =await s.getCharacteristic(U_F2);
-    ch.f3 =await s.getCharacteristic(U_F3);
-    ch.fps=await s.getCharacteristic(U_FPS);
-    ch.shu=await s.getCharacteristic(U_SHU);
-    ch.lst=await s.getCharacteristic(U_LIST);
+
+    // Es demanen una a una i amb nom, perque si en falta alguna se sapiga
+    // quina. La que sol faltar es la de les llistes: vol dir que el firmware
+    // del dispositiu es anterior a aquesta pagina.
+    const get=async(uuid,nom)=>{
+      try{ return await s.getCharacteristic(uuid); }
+      catch(e){ const err=new Error(nom); err.falta=nom; throw err; }
+    };
+    ch.cam=await get(U_CAM,"camera");
+    ch.len=await get(U_LEN,"lens");
+    ch.f1 =await get(U_F1,"filter 1");
+    ch.f2 =await get(U_F2,"filter 2");
+    ch.f3 =await get(U_F3,"filter 3");
+    ch.fps=await get(U_FPS,"fps");
+    ch.shu=await get(U_SHU,"shutter");
+    ch.lst=await get(U_LIST,"lists");
+
     connectat(true);
+    avis("");
     await llegeixEstat();
     log("Connected.");
-  }catch(err){ log("Could not connect: "+err.message); }
+  }catch(err){
+    connectat(false);
+    if(err.falta==="lists"){
+      avis("Connected, but this device is running <b>older firmware</b> than this page: "
+          +"it has no list-upload characteristic. Re-upload the current firmware "
+          +"(04_firmware_slate.ino) to the board and try again.");
+      log("Device firmware too old.");
+    } else if(err.falta){
+      avis("Connected, but the device is missing the <b>"+err.falta+"</b> characteristic. "
+          +"The firmware on the board does not match this page.");
+      log("Missing characteristic: "+err.falta);
+    } else {
+      log("Could not connect: "+err.message);
+    }
+  }
 };
 
 const dec=new TextDecoder();

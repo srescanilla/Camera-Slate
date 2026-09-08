@@ -1,5 +1,23 @@
 # E-Paper Camera Slate
 
+## Què és això
+
+Una etiqueta de càmera per a rodatges, petita i amb bateria. En una pantalla de
+tinta electrònica —que es llegeix a ple sol i manté la imatge encara que
+s'apagui— mostra:
+
+- Quina càmera és (A, B, C…)
+- L'òptica que porta, amb el seu diafragma
+- Els fotogrames per segon i l'obturador
+- Fins a tres filtres, un per cada ranura del portafiltres
+
+Com que cada rodatge porta un joc d'òptiques i filtres diferent, l'aparell no va
+passant per un catàleg enorme. Abans del rodatge carregues des del mòbil, per
+Bluetooth, les llistes curtes d'aquell dia; a plató canvies entre elles amb la
+roda, sense tocar el telèfon.
+
+## What this is
+
 A small battery-powered slate for film sets. It shows, on an e-paper display that
 stays readable in daylight and holds its image with the power off:
 
@@ -12,6 +30,12 @@ Each shoot uses a different set of lenses and filters, so the device does not
 scroll through a huge built-in catalogue. Before the shoot you load that day's
 short lists from a phone over Bluetooth; on set you switch between them with the
 rotary switch, without touching the phone.
+
+## Using this code
+
+This repository has **no licence**, which under GitHub's terms means all rights
+are reserved: it is published so the findings below are findable, not as
+something to reuse. The display driver itself is not mine — see Credits.
 
 ---
 
