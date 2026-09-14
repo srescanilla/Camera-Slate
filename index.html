@@ -115,6 +115,19 @@
     <div class="hint">Read when you connect. Tap "Reload" if you changed something on the device.</div>
     <div class="sets"><button class="btn" id="reread" disabled>Reload</button></div>
   </div>
+
+  <div class="card">
+    <h2>Bluetooth name</h2>
+    <div class="now" style="margin-top:10px">
+      <b>Current</b><span id="n-name">—</span>
+    </div>
+    <div class="addrow" style="margin-top:10px">
+      <input id="name-input" placeholder="e.g. Camera Slate A" maxlength="19">
+      <button class="btn" id="name-btn" disabled>Rename</button>
+    </div>
+    <div class="hint">Useful with several identical devices on the same shoot (CAM A, CAM B…).
+      Renaming restarts the device — you will need to reconnect via Bluetooth afterwards, using the new name.</div>
+  </div>
 </section>
 
 <!-- ---------- CÒPIA ---------- -->
@@ -157,6 +170,7 @@ const U_F3  = "6a2f1000-0005-4b8e-8a2d-9c9f6a2f1000";
 const U_FPS = "6a2f1000-0006-4b8e-8a2d-9c9f6a2f1000";
 const U_SHU = "6a2f1000-0007-4b8e-8a2d-9c9f6a2f1000";
 const U_LIST= "6a2f1000-000a-4b8e-8a2d-9c9f6a2f1000";
+const U_NAME= "6a2f1000-000b-4b8e-8a2d-9c9f6a2f1000";
 
 /* Device limits. Must match the firmware. */
 const MAXLEN = 19;                       // caràcters per nom
@@ -358,6 +372,7 @@ function connectat(on){
   document.getElementById("conn").textContent=on?"Disconnect":"Connect via Bluetooth";
   document.getElementById("send-btn").disabled=!on;
   document.getElementById("reread").disabled=!on;
+  document.getElementById("name-btn").disabled=!on;
 }
 
 document.getElementById("conn").onclick=async()=>{
@@ -383,6 +398,7 @@ document.getElementById("conn").onclick=async()=>{
     ch.fps=await get(U_FPS,"fps");
     ch.shu=await get(U_SHU,"shutter");
     ch.lst=await get(U_LIST,"lists");
+    ch.nam=await get(U_NAME,"name");
 
     connectat(true);
     avis("");
@@ -393,7 +409,7 @@ document.getElementById("conn").onclick=async()=>{
     if(err.falta==="lists"){
       avis("Connected, but this device is running <b>older firmware</b> than this page: "
           +"it has no list-upload characteristic. Re-upload the current firmware "
-          +"(04_firmware_slate.ino) to the board and try again.");
+          +"(05_firmware_slate.ino) to the board and try again.");
       log("Device firmware too old.");
     } else if(err.falta){
       avis("Connected, but the device is missing the <b>"+err.falta+"</b> characteristic. "
@@ -415,8 +431,29 @@ async function llegeixEstat(){
   document.getElementById("n-f1").textContent  = await txt(ch.f1);
   document.getElementById("n-f2").textContent  = await txt(ch.f2);
   document.getElementById("n-f3").textContent  = await txt(ch.f3);
+  const nomActual = await txt(ch.nam);
+  document.getElementById("n-name").textContent = nomActual;
+  const nameInput = document.getElementById("name-input");
+  if (document.activeElement !== nameInput) nameInput.value = (nomActual==="—")?"":nomActual;
 }
 document.getElementById("reread").onclick=()=>llegeixEstat().then(()=>log("Reloaded."));
+
+/* ---------- Bluetooth rename ---------- */
+document.getElementById("name-btn").onclick=async()=>{
+  const cru=document.getElementById("name-input").value.trim();
+  const v=neteja(cru);
+  if(!v){ alert("Enter a name first."); return; }
+  if(v.length>19){ alert("Name too long (max 19 characters)."); return; }
+  if(!confirm("Rename this device to \""+v+"\"?\n\n"
+      +"It will restart and you will need to reconnect via Bluetooth "
+      +"afterwards, using the new name.")) return;
+  try{
+    await ch.nam.writeValue(enc.encode(v));
+    log("Renaming… the device will restart shortly.");
+  }catch(err){
+    log("Rename failed: "+err.message);
+  }
+};
 
 /* ---------- Sending the lists ---------- */
 const enc=new TextEncoder();
