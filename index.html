@@ -69,6 +69,22 @@
   .sendbar .btn{width:100%;padding:15px}
   #log{font-size:11px;color:var(--dim);text-align:center;margin-top:7px;min-height:15px}
 
+  /* Pissarra interactiva: imita la pantalla del dispositiu */
+  .slate{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .slate select{width:100%;padding:11px 10px;border-radius:8px;background:#0e1114;
+                border:1px solid var(--line);color:var(--text);font-size:15px;
+                font-family:ui-monospace,Menlo,Consolas,monospace;max-width:none;
+                -webkit-appearance:none;appearance:none;text-align:center}
+  .slate .cam select{font-size:34px;font-weight:700;padding:10px;letter-spacing:.05em}
+  .slate .lens select{font-size:19px}
+  .slate .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .slate .cam,.slate .lens{margin-bottom:8px}
+  .tray{margin-top:8px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .tray b{display:block;background:var(--text);color:var(--bg);font-size:11px;
+          letter-spacing:.12em;text-align:center;padding:4px;font-weight:700}
+  .tray select{border:none;border-radius:0;font-size:14px}
+  .livehint{font-size:11px;color:var(--dim);margin-top:10px;line-height:1.5}
+
   .now{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;font-size:14px;align-items:center}
   .now b{color:var(--dim);font-weight:400;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
   .now span{font-family:ui-monospace,Menlo,Consolas,monospace}
@@ -86,35 +102,17 @@
 <div style="margin-bottom:16px"><button class="btn" id="conn" style="width:100%">Connect via Bluetooth</button></div>
 
 <nav>
-  <button data-t="send" class="sel">Load</button>
-  <button data-t="now">On set</button>
+  <button data-t="now" class="sel">On set</button>
+  <button data-t="send">Load</button>
   <button data-t="cat">Backup</button>
 </nav>
 
 <!-- ---------- CARREGAR ---------- -->
-<section id="send" class="on">
+<section id="send">
   <div class="card" id="c-lens"></div>
   <div class="card" id="c-filt"></div>
   <div class="card" id="c-fps"></div>
   <div class="card" id="c-shut"></div>
-</section>
-
-<!-- ---------- RODATGE ---------- -->
-<section id="now">
-  <div class="card">
-    <h2>Currently on the device</h2>
-    <div class="now" id="nowbox" style="margin-top:10px">
-      <b>Camera</b><span id="n-cam">—</span>
-      <b>Lens</b><span id="n-lens">—</span>
-      <b>FPS</b><span id="n-fps">—</span>
-      <b>Shutter</b><span id="n-shut">—</span>
-      <b>Slot 1</b><span id="n-f1">—</span>
-      <b>Slot 2</b><span id="n-f2">—</span>
-      <b>Slot 3</b><span id="n-f3">—</span>
-    </div>
-    <div class="hint">Read when you connect. Tap "Reload" if you changed something on the device.</div>
-    <div class="sets"><button class="btn" id="reread" disabled>Reload</button></div>
-  </div>
 
   <div class="card">
     <h2>Bluetooth name</h2>
@@ -125,8 +123,34 @@
       <input id="name-input" placeholder="e.g. Camera Slate A" maxlength="19">
       <button class="btn" id="name-btn" disabled>Rename</button>
     </div>
-    <div class="hint">Useful with several identical devices on the same shoot (CAM A, CAM B…).
-      Renaming restarts the device — you will need to reconnect via Bluetooth afterwards, using the new name.</div>
+    <div class="hint">Use this when several slates are on the same shoot, so you can
+      tell them apart in the Bluetooth list. Renaming restarts the device — you will
+      have to reconnect using the new name. The name is also shown on the device,
+      under Settings.</div>
+  </div>
+</section>
+
+<!-- ---------- RODATGE ---------- -->
+<section id="now" class="on">
+  <div class="card">
+    <h2>On the device — live</h2>
+    <div class="slate" style="margin-top:10px">
+      <div class="cam"><select id="s-cam"></select></div>
+      <div class="lens"><select id="s-lens"></select></div>
+      <div class="pair">
+        <select id="s-fps"></select>
+        <select id="s-shut"></select>
+      </div>
+      <div class="tray"><b>TRAY 1</b><select id="s-f1"></select></div>
+      <div class="tray"><b>TRAY 2</b><select id="s-f2"></select></div>
+      <div class="tray"><b>TRAY 3</b><select id="s-f3"></select></div>
+    </div>
+    <div class="livehint">Changes are applied to the device as soon as you pick them.
+      The options come from the lists currently loaded on that device — if something
+      is missing, load it from the Load tab first.</div>
+    <div class="sets" style="margin-top:10px">
+      <button class="btn" id="reread" disabled>Reload from device</button>
+    </div>
   </div>
 </section>
 
@@ -373,6 +397,7 @@ function connectat(on){
   document.getElementById("send-btn").disabled=!on;
   document.getElementById("reread").disabled=!on;
   document.getElementById("name-btn").disabled=!on;
+  for(const c of CAMPS) document.getElementById(c.id).disabled=!on;
 }
 
 document.getElementById("conn").onclick=async()=>{
@@ -406,10 +431,10 @@ document.getElementById("conn").onclick=async()=>{
     log("Connected.");
   }catch(err){
     connectat(false);
-    if(err.falta==="lists"){
+    if(err.falta==="lists"||err.falta==="name"){
       avis("Connected, but this device is running <b>older firmware</b> than this page: "
           +"it has no list-upload characteristic. Re-upload the current firmware "
-          +"(05_firmware_slate.ino) to the board and try again.");
+          +"(04_firmware_slate.ino) to the board and try again.");
       log("Device firmware too old.");
     } else if(err.falta){
       avis("Connected, but the device is missing the <b>"+err.falta+"</b> characteristic. "
@@ -421,42 +446,86 @@ document.getElementById("conn").onclick=async()=>{
   }
 };
 
+const enc=new TextEncoder();
 const dec=new TextDecoder();
 async function txt(c){ try{ return dec.decode(await c.readValue()).trim(); }catch(e){ return "—"; } }
+
+/* Llegeix una llista del dispositiu: es demana entrada a entrada amb
+   [0xF1, tipus, index] i despres es llegeix la caracteristica. Es para a la
+   primera buida, perque les entrades son contigues. */
+async function llegeixLlista(tipus, max){
+  const out=[];
+  for(let i=0;i<max;i++){
+    await ch.lst.writeValue(new Uint8Array([0xF1,tipus,i]));
+    const v=await txt(ch.lst);
+    if(!v || v==="—") break;
+    out.push(v);
+  }
+  return out;
+}
+
+const CAMPS = [
+  {id:"s-cam",  car:"cam", tipus:null, max:0},              // les cameres son fixes
+  {id:"s-lens", car:"len", tipus:TIPUS.lens, max:CAP.lens},
+  {id:"s-fps",  car:"fps", tipus:TIPUS.fps,  max:CAP.fps},
+  {id:"s-shut", car:"shu", tipus:TIPUS.shut, max:CAP.shut},
+  {id:"s-f1",   car:"f1",  tipus:TIPUS.filt, max:CAP.filt},
+  {id:"s-f2",   car:"f2",  tipus:TIPUS.filt, max:CAP.filt},
+  {id:"s-f3",   car:"f3",  tipus:TIPUS.filt, max:CAP.filt}
+];
+const CAMERES = ["CAM A","CAM B","CAM C","CAM D","CAM E","CAM F"];
+
+function omple(sel, opcions, actual){
+  sel.innerHTML="";
+  if(actual && !opcions.includes(actual)) opcions=[actual,...opcions];  // valor que ja no es a la llista
+  for(const o of opcions){
+    const e=document.createElement("option");
+    e.textContent=o;
+    if(o===actual) e.selected=true;
+    sel.appendChild(e);
+  }
+}
+
 async function llegeixEstat(){
-  document.getElementById("n-cam").textContent = await txt(ch.cam);
-  document.getElementById("n-lens").textContent= await txt(ch.len);
-  document.getElementById("n-fps").textContent = await txt(ch.fps);
-  document.getElementById("n-shut").textContent= await txt(ch.shu);
-  document.getElementById("n-f1").textContent  = await txt(ch.f1);
-  document.getElementById("n-f2").textContent  = await txt(ch.f2);
-  document.getElementById("n-f3").textContent  = await txt(ch.f3);
+  log("Reading device…");
+  const lens = await llegeixLlista(TIPUS.lens, CAP.lens);
+  const fps  = await llegeixLlista(TIPUS.fps,  CAP.fps);
+  const shut = await llegeixLlista(TIPUS.shut, CAP.shut);
+  const filt = await llegeixLlista(TIPUS.filt, CAP.filt);
+
+  for(const c of CAMPS){
+    const actual = await txt(ch[c.car]);
+    let opts;
+    if(c.id==="s-cam")       opts=CAMERES;
+    else if(c.car==="len")   opts=lens;
+    else if(c.car==="fps")   opts=fps;
+    else if(c.car==="shu")   opts=shut;
+    else                     opts=filt;
+    omple(document.getElementById(c.id), [...opts], actual);
+  }
+
   const nomActual = await txt(ch.nam);
   document.getElementById("n-name").textContent = nomActual;
-  const nameInput = document.getElementById("name-input");
-  if (document.activeElement !== nameInput) nameInput.value = (nomActual==="—")?"":nomActual;
+  const ni = document.getElementById("name-input");
+  if (document.activeElement !== ni) ni.value = (nomActual==="—") ? "" : nomActual;
+  log("Ready.");
 }
+
+/* Canviar un desplegable escriu de seguida: el dispositiu ho aplica en directe */
+for(const c of CAMPS){
+  document.getElementById(c.id).onchange = async e=>{
+    try{
+      await ch[c.car].writeValue(enc.encode(e.target.value));
+      log("Sent: "+e.target.value);
+      // Els filtres poden intercanviar-se de safata al dispositiu: cal rellegir
+      if(c.car.startsWith("f")) setTimeout(()=>llegeixEstat(),700);
+    }catch(err){ log("Failed: "+err.message); }
+  };
+}
+
 document.getElementById("reread").onclick=()=>llegeixEstat().then(()=>log("Reloaded."));
 
-/* ---------- Bluetooth rename ---------- */
-document.getElementById("name-btn").onclick=async()=>{
-  const cru=document.getElementById("name-input").value.trim();
-  const v=neteja(cru);
-  if(!v){ alert("Enter a name first."); return; }
-  if(v.length>19){ alert("Name too long (max 19 characters)."); return; }
-  if(!confirm("Rename this device to \""+v+"\"?\n\n"
-      +"It will restart and you will need to reconnect via Bluetooth "
-      +"afterwards, using the new name.")) return;
-  try{
-    await ch.nam.writeValue(enc.encode(v));
-    log("Renaming… the device will restart shortly.");
-  }catch(err){
-    log("Rename failed: "+err.message);
-  }
-};
-
 /* ---------- Sending the lists ---------- */
-const enc=new TextEncoder();
 function paquet(bytes){ return new Uint8Array(bytes); }
 
 async function envia(){
@@ -487,6 +556,20 @@ async function envia(){
   btn.disabled=false;
 }
 document.getElementById("send-btn").onclick=envia;
+
+document.getElementById("name-btn").onclick=async()=>{
+  const cru=document.getElementById("name-input").value.trim();
+  const v=neteja(cru);
+  if(!v){ alert("Enter a name first."); return; }
+  if(v.length>19){ alert("Name too long (max 19 characters)."); return; }
+  if(!confirm("Rename this device to \""+v+"\"?\n\n"
+     +"It will restart and you will have to reconnect via Bluetooth "
+     +"using the new name.")) return;
+  try{
+    await ch.nam.writeValue(enc.encode(v));
+    log("Renaming… the device is restarting.");
+  }catch(err){ log("Rename failed: "+err.message); }
+};
 
 /* ---------- Browser warnings ---------- */
 (function(){
